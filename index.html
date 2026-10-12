@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F7BF2"><meta name="description" content="ระบบจัดตารางสอนแทนสำหรับโรงเรียน">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="สอนแทน"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>ระบบจัดตารางสอนแทน</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Prompt:wght@500;600;700&display=swap">
+<style>
+/* Layout: left sidebar menu (drawer on phones) + one working area; schedule grids use periods as rows, weekdays as columns. */
+:root{
+  --bg:#F3F8FD; --surface:#FFFFFF; --surface2:#EAF2FB; --line:#DCE7F3;
+  --fg:#11243A; --muted:#5B7089; --accent:#1F7BF2; --accent-fg:#FFFFFF; --accent-soft:#DDEBFF;
+  --sun:#FFC52E; --sun-soft:#FFF2CC; --leave:#E5483A; --leave-soft:#FFE4E1; --free:#0E8F68; --free-soft:#D8F5EA;
+  --shadow:0 1px 2px rgba(17,36,58,.06),0 6px 18px rgba(17,36,58,.06);
+  --f-display:"Prompt","IBM Plex Sans Thai",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Thai","Prompt",system-ui,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C1624; --surface:#142236; --surface2:#1B2E47; --line:#25405F;
+  --fg:#E8F0FA; --muted:#93A7C0; --accent:#5AA2FF; --accent-fg:#08162A; --accent-soft:#1C3558;
+  --sun:#FFD04D; --sun-soft:#3A3216; --leave:#FF8176; --leave-soft:#43201E; --free:#3DD6A5; --free-soft:#123A2F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1624; --surface:#142236; --surface2:#1B2E47; --line:#25405F;
+  --fg:#E8F0FA; --muted:#93A7C0; --accent:#5AA2FF; --accent-fg:#08162A; --accent-soft:#1C3558;
+  --sun:#FFD04D; --sun-soft:#3A3216; --leave:#FF8176; --leave-soft:#43201E; --free:#3DD6A5; --free-soft:#123A2F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
+.app{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100%}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 14px}
+.brand-mark{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+.brand b{font-family:var(--f-display);font-size:17px;font-weight:600;line-height:1.2;display:block}
+.brand span{font-size:12px;color:var(--muted)}
+.nav-label{font-size:12px;letter-spacing:.06em;color:var(--muted);padding:12px 12px 4px;font-weight:500}
+.nav button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;border-radius:10px;cursor:pointer;color:var(--fg);font-weight:500}
+.nav button:hover{background:var(--surface2)}
+.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.nav button:focus-visible{outline:3px solid var(--accent)}
+.nav svg{flex:none}
+.nav .cnt{margin-left:auto;font-size:12px;background:var(--leave);color:#fff;border-radius:99px;padding:0 7px;min-width:20px;text-align:center}
+.main{min-width:0;padding:26px clamp(16px,3vw,36px) 60px}
+.topbar{display:none}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.head{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;justify-content:space-between}
+.head h1{font-size:26px;font-weight:600;line-height:1.25}
+.head p{margin:2px 0 0;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:10px;cursor:pointer;font-weight:500;min-height:40px}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--leave);border-color:transparent;background:transparent}
+.btn.danger:hover{background:var(--leave-soft)}
+.btn.sm{padding:4px 10px;min-height:32px;font-size:14px}
+.btn.icon{padding:8px;min-width:40px;justify-content:center}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.pad{padding:16px 18px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label,.lbl{font-size:13px;color:var(--muted);font-weight:500}
+input[type=text],input[type=date],input[type=month],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 11px;min-height:40px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:70px}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.seg{display:inline-flex;background:var(--surface2);border-radius:11px;padding:3px;gap:2px}
+.seg button{all:unset;box-sizing:border-box;padding:6px 14px;border-radius:9px;cursor:pointer;font-weight:500;color:var(--muted);min-height:34px;display:inline-flex;align-items:center}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
+.seg button:focus-visible{outline:3px solid var(--accent)}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:600;font-size:15px;flex:none;color:#10263f}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who b{font-weight:600;overflow-wrap:anywhere}
+.who small{display:block;color:var(--muted);font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:99px;padding:2px 10px;font-size:13px;font-weight:500;background:var(--surface2);color:var(--fg);white-space:nowrap}
+.chip.leave{background:var(--leave-soft);color:var(--leave)}
+.chip.free{background:var(--free-soft);color:var(--free)}
+.chip.sub{background:var(--accent-soft);color:var(--accent)}
+.chip.sun{background:var(--sun-soft);color:var(--fg)}
+.muted{color:var(--muted)}
+.empty{padding:34px 18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font-family:var(--f-display);font-size:17px;margin-bottom:4px}
+.banner{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;background:var(--sun-soft);border:1px solid var(--sun);border-radius:var(--r);padding:10px 14px}
+.banner span{flex:1 1 260px}
+/* lists */
+.list{display:flex;flex-direction:column}
+.row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .grow{flex:1 1 220px;min-width:0}
+.row .tools{display:flex;gap:6px;flex-wrap:wrap}
+/* timetable grid */
+.scroll{overflow-x:auto}
+.tt{display:grid;grid-template-columns:64px repeat(5,minmax(132px,1fr));min-width:760px}
+.tt>div{padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.tt .h{background:var(--surface2);font-family:var(--f-display);font-weight:600;text-align:center;position:sticky;top:0}
+.tt .p{background:var(--surface2);font-family:var(--f-display);font-weight:600;text-align:center;display:grid;place-items:center;font-size:18px}
+.tt .p small{display:block;font-family:var(--f-body);font-weight:400;font-size:11px;color:var(--muted)}
+.cell{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;min-height:76px;cursor:pointer;border-radius:10px;padding:8px;text-align:left}
+.cell:hover{background:var(--surface2)}
+.cell.empty-c{align-items:center;justify-content:center;color:var(--muted);border:1.5px dashed var(--line);font-size:13px}
+.cell.has{background:var(--accent-soft)}
+.cell.has b{font-weight:600;color:var(--fg);overflow-wrap:anywhere;line-height:1.3}
+.cell small{color:var(--muted);overflow-wrap:anywhere}
+.cell:focus-visible{outline:3px solid var(--accent)}
+.free-chips{display:flex;flex-wrap:wrap;gap:5px}
+.free-chips .chip{background:var(--free-soft);color:var(--free)}
+.tt .fc{min-height:84px}
+/* sub cards */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{padding:12px 16px}
+.stat b{display:block;font-family:var(--f-display);font-size:28px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.slot{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1.1fr) auto;gap:10px 14px;align-items:center;padding:10px 16px;border-top:1px solid var(--line)}
+.pn{width:40px;height:40px;border-radius:12px;background:var(--sun);color:#3a2b00;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:18px}
+.slot.done .pn{background:var(--free-soft);color:var(--free)}
+.card-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:var(--r) var(--r) 0 0}
+/* daily sheet */
+.sheet{padding:22px clamp(14px,3vw,30px)}
+.sheet-t{text-align:center;display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+.sheet-t .s{font-family:var(--f-display);font-weight:600;font-size:20px}
+.sheet-t .t{font-family:var(--f-display);font-weight:700;font-size:26px;color:var(--accent)}
+.grp{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.grp:first-of-type{border-top:0}
+.ent{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:6px 14px;padding:6px 0;align-items:center}
+.ent .arrow{color:var(--muted)}
+.sum-t{width:100%;border-collapse:collapse;min-width:520px}
+.sum-t th,.sum-t td{padding:10px 12px;text-align:left;border-top:1px solid var(--line);vertical-align:middle}
+.sum-t th{background:var(--surface2);border-top:0;font-family:var(--f-display);font-weight:600;font-size:14px}
+.sum-t td.n,.sum-t th.n{text-align:center;font-variant-numeric:tabular-nums}
+.sum-t tr.det td{background:var(--surface2)}
+.sum-t tr.clk{cursor:pointer}
+.sum-t tr.clk:hover td{background:var(--surface2)}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(8,20,36,.5);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{background:var(--surface);border-radius:16px;width:min(520px,100%);max-height:100%;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal header{padding:16px 20px 4px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modal header h2{font-size:19px;font-weight:600}
+.modal .body{padding:10px 20px 6px;display:flex;flex-direction:column;gap:14px}
+.modal footer{padding:12px 20px 18px;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.modal footer .l{margin-right:auto}
+.pgrid{display:flex;flex-wrap:wrap;gap:6px}
+.pgrid button{all:unset;box-sizing:border-box;width:44px;height:40px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;font-weight:600;font-family:var(--f-display)}
+.pgrid button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.pgrid button:focus-visible{outline:3px solid var(--accent)}
+.warn{background:var(--sun-soft);border-radius:10px;padding:8px 12px;font-size:14px}
+.err{color:var(--leave);font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:12px;z-index:60;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.dnote{font-size:13px;color:var(--muted)}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;z-index:40;left:0;top:0;width:280px;max-width:86%;transform:translateX(-102%);transition:transform .2s;box-shadow:var(--shadow);padding-top:calc(20px + env(safe-area-inset-top,0px))}
+  .side.open{transform:none}
+  .scrim{position:fixed;inset:0;background:rgba(8,20,36,.45);z-index:39}
+  .topbar{display:flex;align-items:center;gap:10px;position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);padding:10px 16px;border-bottom:1px solid var(--line)}
+  .topbar b{font-family:var(--f-display);font-weight:600}
+  .main{padding-top:18px}
+  .slot{grid-template-columns:44px minmax(0,1fr)}
+  .slot>:nth-child(3),.slot>:nth-child(4){grid-column:2}
+  .ent{grid-template-columns:minmax(0,1fr)}
+  .ent .arrow{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>
+.side{padding-top:calc(20px + env(safe-area-inset-top,0px));top:0}
+.main{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+@media (max-width:900px){.topbar{top:0;padding-top:calc(10px + env(safe-area-inset-top,0px))}.main{padding-top:18px}}
+</style></head><body>
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="เมนูหลัก"></aside>
+  <div style="min-width:0">
+    <div class="topbar">
+      <button class="btn icon" id="menuBtn" aria-label="เปิดเมนู"></button>
+      <b id="topTitle">ระบบจัดตารางสอนแทน</b>
+    </div>
+    <main class="main" id="main"><div class="empty"><b>กำลังโหลดข้อมูล</b>รอสักครู่</div></main>
+  </div>
+</div>
+<div id="layer"></div>
+<script>
+"use strict";
+/* ---------- constants & small helpers ---------- */
+const DAYS=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
+const DS=['จ.','อ.','พ.','พฤ.','ศ.'];
+const MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const PER=[1,2,3,4,5,6];
+const LEAVE_TYPES=['ลาป่วย','ลากิจ','ลาพักผ่อน','ไปราชการ','อบรม/สัมมนา','อื่น ๆ'];
+const AVC=['#BFE0FF','#FFD9A8','#C9F1D9','#FFD0E0','#E4D6FF','#FFF0A6','#BDEFEF','#FFCFC4'];
+const $=s=>document.querySelector(s);
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>'i'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
+const p2=n=>String(n).padStart(2,'0');
+const fmt=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+const parse=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
+const wd=s=>(parse(s).getDay()+6)%7;           /* Mon=0 .. Sun=6 */
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return fmt(d)};
+const thaiDate=s=>{const d=parse(s);return DAYS[wd(s)]+'ที่ '+d.getDate()+' '+MONTHS[d.getMonth()]+' '+(d.getFullYear()+543)};
+const thaiShort=s=>{const d=parse(s);return d.getDate()+' '+MS[d.getMonth()]+' '+String(d.getFullYear()+543).slice(2)};
+const thaiMonth=ym=>{const a=ym.split('-').map(Number);return MONTHS[a[1]-1]+' '+(a[0]+543)};
+function nextWorkday(s){let d=s;while(wd(d)>4)d=addDays(d,1);return d}
+const TODAY=nextWorkday(fmt(new Date()));
+const plural=(n,w)=>n+' '+w;
+
+/* ---------- icons ---------- */
+const IC={
+ users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.2c2.6.2 4.5 2 4.5 4.8"/>',
+ table:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 10v10M15 10v10"/>',
+ swap:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+ leave:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18M9.5 14l5 4M14.5 14l-5 4"/>',
+ free:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ cls:'<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"/>',
+ book:'<path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4zM5 16a4 4 0 0 1 4-4h10"/>',
+ sheet:'<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>',
+ chart:'<path d="M5 20V11M11 20V4M17 20v-6M3 20h18"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',
+ trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+ left:'<path d="M15 5l-7 7 7 7"/>',
+ right:'<path d="M9 5l7 7-7 7"/>',
+ down:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+ wand:'<path d="M5 19L16 8M14 4v3M14 11v3M18 9h3M7 9h3M17.5 5.5l1.5-1.5"/>',
+ x:'<path d="M6 6l12 12M18 6L6 18"/>',
+ cap:'<path d="M3 9l9-5 9 5-9 5zM7 12v5c0 1.5 2.2 3 5 3s5-1.5 5-3v-5"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>'
+};
+const ico=(n,s=20)=>'<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[n]+'</svg>';
+
+/* ---------- state ---------- */
+const KEYS=['teachers','classes','subjects','schedule','leaves','subs','meta'];
+let S=sampleState();
+let view='subs';
+let V={date:TODAY,sched:null,leaveMonth:TODAY.slice(0,7),leaveAll:false,freeDate:TODAY,freeReal:true,sumScope:'month',sumDate:TODAY,sumAll:false,sumOpen:null};
+let ready=false,persisted=false,db=null,dl=null;
+
+function sampleState(){
+  const names=['ครูสมชาย ใจดี','ครูสุดา รักเรียน','ครูวิชัย มั่นคง','ครูมาลี สดใส','ครูประเสริฐ ทองดี','ครูนภา แสงจันทร์','ครูอนันต์ ศรีสุข','ครูพิมพ์ใจ วงศ์งาม'];
+  const depts=['ภาษาไทย','คณิตศาสตร์','วิทยาศาสตร์','สังคมศึกษา','ภาษาอังกฤษ','สุขศึกษาฯ','ศิลปะ','การงานอาชีพ'];
+  const teachers=names.map((n,i)=>({id:'t'+(i+1),name:n,dept:depts[i]}));
+  const clsN=['ม.1/1','ม.1/2','ม.2/1','ม.2/2','ม.3/1'];
+  const classes=clsN.map((n,i)=>({id:'c'+(i+1),name:n,home:'t'+(i+1)}));
+  const subN=[['ท21101','ภาษาไทย'],['ค21101','คณิตศาสตร์'],['ว21101','วิทยาศาสตร์'],['ส21101','สังคมศึกษา'],['อ21101','ภาษาอังกฤษ'],['พ21101','สุขศึกษาและพลศึกษา'],['ศ21101','ศิลปะ'],['ง21101','การงานอาชีพ']];
+  const subjects=subN.map((s,i)=>({id:'s'+(i+1),code:s[0],name:s[1]}));
+  const schedule={};
+  teachers.forEach((t,i)=>{const m={};for(let d=1;d<=5;d++)for(let p=1;p<=6;p++){if((d*6+p+i*3)%5<3){m[d+'-'+p]={subjectId:'s'+(i+1),classId:'c'+(((d+p+i)%5)+1),note:''}}}schedule[t.id]=m});
+  const leaves=[{id:'l1',teacherId:'t1',from:TODAY,to:TODAY,type:'ลาป่วย',allDay:true,periods:[],note:''},{id:'l2',teacherId:'t3',from:TODAY,to:TODAY,type:'ไปราชการ',allDay:false,periods:[1,2,3],note:''}];
+  return{teachers,classes,subjects,schedule,leaves,subs:[],meta:{school:'โรงเรียนตัวอย่าง',title:'ใบมอบหมายสอนแทน',signer:'หัวหน้าฝ่ายวิชาการ',sample:true}};
+}
+const T=id=>S.teachers.find(x=>x.id===id);
+const C=id=>S.classes.find(x=>x.id===id);
+const SB=id=>S.subjects.find(x=>x.id===id);
+const slotOf=(tid,d,p)=>(S.schedule[tid]||{})[d+'-'+p];
+const tName=id=>{const t=T(id);return t?t.name:'(ครูที่ถูกลบ)'};
+const cName=id=>{const c=C(id);return c?c.name:'—'};
+const sName=id=>{const s=SB(id);return s?s.name:'ไม่ระบุวิชา'};
+function stripPrefix(n){return n.replace(/^(ว่าที่\s?ร\.?ต\.?\s?(หญิง)?|นางสาว|นาย|นาง|ครู|ดร\.|ผศ\.|รศ\.)\s*/,'')}
+function firstName(t){return stripPrefix(t.name).split(/\s+/)[0]||t.name}
+function shortName(t){
+  const f=firstName(t);const dup=S.teachers.some(o=>o.id!==t.id&&firstName(o)===f);
+  if(!dup)return f;const parts=stripPrefix(t.name).split(/\s+/);return f+(parts[1]?' '+Array.from(parts[1])[0]+'.':'');
+}
+function initial(t){
+  const a=Array.from(stripPrefix(t.name));const k=a.find(ch=>/[ก-ฮ]/.test(ch));return k||a[0]||'?';
+}
+function avatar(t,size){
+  if(!t)return '<span class="av" style="background:var(--surface2);color:var(--muted)">?</span>';
+  let h=0;for(const ch of t.id)h=(h*31+ch.charCodeAt(0))>>>0;
+  const st=size?';width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*.44)+'px':'';
+  return '<span class="av" style="background:'+AVC[h%AVC.length]+st+'">'+esc(initial(t))+'</span>';
+}
+function weekOf(s){const m=addDays(s,-wd(s));return[0,1,2,3,4].map(i=>addDays(m,i))}
+const monthDays=ym=>{const a=ym.split('-').map(Number);const n=new Date(a[0],a[1],0).getDate();return Array.from({length:n},(_,i)=>ym+'-'+p2(i+1))};
+
+/* ---------- domain logic ---------- */
+function leaveCovers(l,date,p){
+  if(date<l.from||date>l.to||wd(date)>4)return false;
+  return l.allDay||(l.periods||[]).includes(p);
+}
+const onLeave=(tid,date,p)=>S.leaves.some(l=>l.teacherId===tid&&leaveCovers(l,date,p));
+const teaches=(tid,date,p)=>!!slotOf(tid,wd(date)+1,p);
+const subRec=(date,p,absentId)=>S.subs.find(x=>x.date===date&&x.period===p&&x.absentId===absentId);
+const busySub=(date,p)=>new Set(S.subs.filter(x=>x.date===date&&x.period===p&&x.subId).map(x=>x.subId));
+function isFree(tid,date,p,real){
+  if(wd(date)>4)return false;
+  if(teaches(tid,date,p))return false;
+  if(!real)return true;
+  if(onLeave(tid,date,p))return false;
+  return !busySub(date,p).has(tid);
+}
+const dayLoad=(tid,date)=>S.subs.filter(x=>x.subId===tid&&x.date===date).length;
+const monthLoad=(tid,date)=>S.subs.filter(x=>x.subId===tid&&x.date.slice(0,7)===date.slice(0,7)).length;
+function needsOn(date){
+  const out=[];
+  if(wd(date)>4)return out;
+  S.teachers.forEach(t=>{
+    const ls=S.leaves.filter(l=>l.teacherId===t.id&&date>=l.from&&date<=l.to);
+    if(!ls.length)return;
+    const rows=[];
+    PER.forEach(p=>{
+      if(!onLeave(t.id,date,p))return;
+      const sl=slotOf(t.id,wd(date)+1,p);
+      if(sl)rows.push({p,sl,rec:subRec(date,p,t.id)});
+    });
+    out.push({t,leaves:ls,rows,all:ls.some(l=>l.allDay)});
+  });
+  return out;
+}
+function assign(date,p,absentId,subId,sl){
+  const i=S.subs.findIndex(x=>x.date===date&&x.period===p&&x.absentId===absentId);
+  if(!subId){if(i>=0)S.subs.splice(i,1);return}
+  const rec={id:i>=0?S.subs[i].id:uid(),date,period:p,absentId,subId,classId:sl.classId,subjectId:sl.subjectId,note:i>=0?S.subs[i].note||'':''};
+  if(i>=0)S.subs[i]=rec;else S.subs.push(rec);
+}
+function candidates(date,p,absentId){
+  return S.teachers.filter(t=>t.id!==absentId&&isFree(t.id,date,p,true))
+    .sort((a,b)=>(dayLoad(a.id,date)+monthLoad(a.id,date)/10)-(dayLoad(b.id,date)+monthLoad(b.id,date)/10)||a.name.localeCompare(b.name,'th'));
+}
+
+/* ---------- persistence ---------- */
+const bodyOf=k=>k==='schedule'?{map:S.schedule}:k==='meta'?Object.assign({},S.meta):{items:S[k]};
+const fromDoc=(k,d)=>k==='schedule'?(d.map||{}):k==='meta'?Object.assign({school:'',title:'ใบมอบหมายสอนแทน',signer:'',sample:false},d):(d.items||[]);
+const timers={},writing={},pending={},dirty={};
+function localSave(){try{localStorage.setItem('subsched.v1',JSON.stringify(S))}catch(e){toast('บันทึกลงเครื่องไม่ได้ ตรวจสอบว่าไม่ได้เปิดโหมดส่วนตัว')}}
+async function flush(k){
+  if(writing[k]){pending[k]=true;return}
+  writing[k]=true;
+  try{await db.collection('sub').doc(k).set(bodyOf(k))}
+  catch(e){toast(e&&e.code==='invalid_argument'?'บัญชีนี้ไม่มีสิทธิ์แก้ไขข้อมูล':'บันทึกไม่สำเร็จ ลองอีกครั้ง')}
+  writing[k]=false;
+  if(pending[k]){pending[k]=false;flush(k)}else dirty[k]=false;
+}
+function commit(keys,noRender){
+  if(!persisted){keys=KEYS;persisted=true}
+  if(db){keys.forEach(k=>{dirty[k]=true;clearTimeout(timers[k]);timers[k]=setTimeout(()=>flush(k),250)})}
+  else localSave();
+  if(!noRender)render();
+}
+const seen=new Set();
+function onSnap(k,snap){
+  seen.add(k);
+  if(snap.exists){
+    if(k==='meta')persisted=true;
+    if(!dirty[k]&&!writing[k]){
+      const v=fromDoc(k,snap.data());
+      if(JSON.stringify(v)!==JSON.stringify(S[k])){S[k]=v;if(ready)render()}
+    }
+  }else if(persisted&&!dirty[k]&&!writing[k]){
+    const e=k==='schedule'?{}:k==='meta'?S.meta:[];
+    if(JSON.stringify(e)!==JSON.stringify(S[k])){S[k]=e;if(ready)render()}
+  }
+  if(!ready&&seen.size>=KEYS.length){ready=true;render()}
+}
+
+/* ---------- UI framework ---------- */
+let toastT;
+function toast(msg){
+  let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}
+  el.textContent=msg;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},3200);
+}
+const acts={},chg={};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(el&&acts[el.dataset.act]){acts[el.dataset.act](el.dataset,el,e)}});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el&&chg[el.dataset.chg])chg[el.dataset.chg](el.value,el,el.dataset)});
+function closeModal(){$('#layer').innerHTML='';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#layer').innerHTML)closeModal()});
+function modal(title,bodyHtml,footHtml){
+  $('#layer').innerHTML='<div class="ov" data-act="ovclose"><div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><header><h2>'+esc(title)+'</h2><button class="btn icon sm" data-act="close" aria-label="ปิด">'+ico('x',18)+'</button></header><div class="body">'+bodyHtml+'</div><footer>'+footHtml+'</footer></div></div>';
+  const f=$('#layer').querySelector('input[type=text],select,input');if(f)setTimeout(()=>f.focus(),30);
+}
+acts.close=()=>closeModal();
+acts.ovclose=(d,el,e)=>{if(e.target===el)closeModal()};
+function confirmBox(title,msg,okLabel,fn){
+  modal(title,'<p style="margin:0">'+esc(msg)+'</p>','<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="okBtn" style="background:var(--leave);border-color:var(--leave)">'+esc(okLabel)+'</button>');
+  $('#okBtn').onclick=()=>{closeModal();fn()};
+}
+const opts=(list,sel,lab,none)=>(none?'<option value="">'+esc(none)+'</option>':'')+list.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===sel?' selected':'')+'>'+esc(lab(x))+'</option>').join('');
+function head(title,sub,actions){return '<div class="head"><div><h1>'+esc(title)+'</h1>'+(sub?'<p>'+sub+'</p>':'')+'</div><div class="actions">'+(actions||'')+'</div></div>'}
+function dateBar(key,extra){
+  const v=V[key];
+  return '<div class="toolbar"><button class="btn icon" data-act="dshift" data-k="'+key+'" data-n="-1" aria-label="วันก่อนหน้า">'+ico('left')+'</button>'
+   +'<div class="field" style="width:170px"><label for="d_'+key+'" class="lbl" style="position:absolute;left:-9999px">วันที่</label><input type="date" id="d_'+key+'" value="'+v+'" data-chg="dset" data-k="'+key+'"></div>'
+   +'<button class="btn icon" data-act="dshift" data-k="'+key+'" data-n="1" aria-label="วันถัดไป">'+ico('right')+'</button>'
+   +'<button class="btn" data-act="dtoday" data-k="'+key+'">วันนี้</button>'
+   +'<span class="chip '+(wd(v)>4?'leave':'sun')+'">'+esc(thaiDate(v))+'</span>'+(extra||'')+'</div>';
+}
+chg.dset=(v,el,d)=>{if(v){V[d.k]=v;render()}};
+acts.dshift=d=>{let n=+d.n;let x=addDays(V[d.k],n);while(wd(x)>4)x=addDays(x,n);V[d.k]=x;render()};
+acts.dtoday=d=>{V[d.k]=TODAY;render()};
+
+/* ---------- navigation ---------- */
+const NAV=[
+  ['subs','swap','จัดสอนแทน'],['leaves','leave','ครูลา'],['free','free','คาบว่าง'],['daily','sheet','ตารางสอนแทนประจำวัน'],['summary','chart','สรุปชั่วโมงสอนแทน'],
+  null,
+  ['teachers','users','ครู'],['schedule','table','ตารางสอนครู'],['classes','cls','ชั้นเรียน'],['subjects','book','รายวิชา']
+];
+function renderNav(){
+  const pending=wd(TODAY)<5?needsOn(TODAY).reduce((n,x)=>n+x.rows.filter(r=>!r.rec||!r.rec.subId).length,0):0;
+  let h='<div class="brand"><div class="brand-mark">'+ico('cap',22)+'</div><div><b>จัดตารางสอนแทน</b><span>'+esc(S.meta.school||'')+'</span></div></div><nav class="nav">';
+  let grp=0;
+  NAV.forEach(n=>{
+    if(!n){h+='<div class="nav-label">ข้อมูลหลัก</div>';return}
+    if(grp===0){h+='<div class="nav-label">งานประจำวัน</div>';grp=1}
+    h+='<button data-act="go" data-v="'+n[0]+'"'+(view===n[0]?' aria-current="page"':'')+'>'+ico(n[1])+'<span>'+n[2]+'</span>'+(n[0]==='subs'&&pending?'<span class="cnt" title="คาบที่ยังไม่มีครูแทนวันนี้">'+pending+'</span>':'')+'</button>';
+  });
+  h+='</nav><div style="flex:1"></div><div style="padding:6px 4px;display:flex;flex-direction:column;gap:8px"><button class="btn sm" data-act="backup">'+ico('down',16)+'สำรองข้อมูล</button><button class="btn sm" data-act="restore">'+ico('plus',16)+'กู้คืนข้อมูล</button><div class="dnote">ข้อมูลอยู่ในเครื่องนี้เท่านั้น ควรสำรองเป็นไฟล์เป็นระยะ</div></div>';
+  $('#side').innerHTML=h;
+  const cur=NAV.find(n=>n&&n[0]===view);$('#topTitle').textContent=cur?cur[2]:'';
+}
+acts.go=d=>{view=d.v;$('#side').classList.remove('open');const sc=$('#scrim');if(sc)sc.remove();render();window.scrollTo(0,0)};
+function openMenu(){
+  $('#side').classList.add('open');
+  if(!$('#scrim')){const s=document.createElement('div');s.id='scrim';s.className='scrim';s.onclick=()=>{$('#side').classList.remove('open');s.remove()};document.body.appendChild(s)}
+}
+/* ================= VIEWS: master data ================= */
+const VIEWS={};
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('#layer input[type=text]')){const b=$('#saveBtn');if(b){e.preventDefault();b.click()}}});
+function sampleBanner(){
+  return '<div class="banner"><span><b>ข้อมูลตัวอย่าง</b> ชื่อครู ชั้นเรียน และตารางสอนที่เห็นเป็นตัวอย่างสำหรับลองใช้ เมื่อพร้อมแล้วให้ล้างออกและกรอกข้อมูลจริงของโรงเรียน</span><button class="btn primary sm" data-act="clearSample">ล้างข้อมูลตัวอย่าง เริ่มใช้งานจริง</button></div>';
+}
+acts.clearSample=()=>confirmBox('ล้างข้อมูลตัวอย่าง','รายชื่อครู ชั้นเรียน รายวิชา ตารางสอน การลา และการสอนแทนที่เป็นตัวอย่างจะถูกลบทั้งหมด','ล้างและเริ่มใหม่',()=>{
+  S.teachers=[];S.classes=[];S.subjects=[];S.schedule={};S.leaves=[];S.subs=[];S.meta.sample=false;V.sched=null;commit(KEYS);toast('ล้างข้อมูลตัวอย่างแล้ว เริ่มเพิ่มครูได้เลย');
+});
+function render(){
+  if(!ready)return;
+  renderNav();
+  const h=(S.meta.sample?sampleBanner():'')+VIEWS[view]();
+  $('#main').innerHTML='<div class="wrap">'+h+'</div>';
+}
+const nSlots=tid=>Object.keys(S.schedule[tid]||{}).length;
+
+/* ---- teachers ---- */
+VIEWS.teachers=()=>{
+  const rows=S.teachers.map(t=>'<div class="row"><div class="grow who">'+avatar(t)+'<div><b>'+esc(t.name)+'</b><small>'+esc(t.dept||'ไม่ได้ระบุกลุ่มสาระ')+'</small></div></div>'
+    +'<span class="chip '+(nSlots(t.id)?'sub':'')+'">สอน '+nSlots(t.id)+' คาบ/สัปดาห์</span>'
+    +'<div class="tools"><button class="btn sm" data-act="tsched" data-id="'+t.id+'">'+ico('table',16)+'ตารางสอน</button><button class="btn sm" data-act="tedit" data-id="'+t.id+'">'+ico('edit',16)+'แก้ไข</button><button class="btn sm danger" data-act="tdel" data-id="'+t.id+'" aria-label="ลบ '+esc(t.name)+'">'+ico('trash',16)+'ลบ</button></div></div>').join('');
+  return head('ครู','ทั้งหมด '+S.teachers.length+' คน','<button class="btn primary" data-act="tadd">'+ico('plus',18)+'เพิ่มครู</button>')
+   +'<div class="card list">'+(rows||'<div class="empty"><b>ยังไม่มีรายชื่อครู</b>กด “เพิ่มครู” เพื่อเริ่มต้น จากนั้นไปกรอกตารางสอนของแต่ละคน</div>')+'</div>';
+};
+function teacherModal(id){
+  const t=id?T(id):{name:'',dept:''};
+  modal(id?'แก้ไขข้อมูลครู':'เพิ่มครู',
+   '<div class="field"><label for="f_name">ชื่อ-สกุล (รวมคำนำหน้า)</label><input type="text" id="f_name" value="'+esc(t.name)+'" placeholder="เช่น นางสาวสมหญิง ใจดี"></div>'
+   +'<div class="field"><label for="f_dept">กลุ่มสาระ / ตำแหน่ง (ไม่บังคับ)</label><input type="text" id="f_dept" value="'+esc(t.dept||'')+'" placeholder="เช่น คณิตศาสตร์"></div><div class="err" id="ferr"></div>',
+   '<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  $('#saveBtn').onclick=()=>{
+    const name=$('#f_name').value.trim(),dept=$('#f_dept').value.trim();
+    if(!name){$('#ferr').textContent='กรุณากรอกชื่อครู';return}
+    if(S.teachers.some(x=>x.id!==id&&x.name===name)){$('#ferr').textContent='มีชื่อนี้อยู่แล้ว';return}
+    if(id){t.name=name;t.dept=dept}else{const n={id:uid(),name,dept};S.teachers.push(n);S.schedule[n.id]={}}
+    closeModal();commit(['teachers','schedule']);toast(id?'บันทึกแล้ว':'เพิ่มครูแล้ว');
+  };
+}
+acts.tadd=()=>teacherModal(null);
+acts.tedit=d=>teacherModal(d.id);
+acts.tsched=d=>{V.sched=d.id;view='schedule';render();window.scrollTo(0,0)};
+acts.tdel=d=>confirmBox('ลบครู','ลบ '+tName(d.id)+' ออกจากระบบ ตารางสอน การลา และรายการสอนแทนที่เกี่ยวข้องจะถูกลบด้วย','ลบครู',()=>{
+  const id=d.id;S.teachers=S.teachers.filter(x=>x.id!==id);delete S.schedule[id];
+  S.leaves=S.leaves.filter(l=>l.teacherId!==id);S.subs=S.subs.filter(x=>x.absentId!==id&&x.subId!==id);
+  S.classes.forEach(c=>{if(c.home===id)c.home=''});if(V.sched===id)V.sched=null;
+  commit(['teachers','schedule','leaves','subs','classes']);toast('ลบครูแล้ว');
+});
+
+/* ---- teacher schedule ---- */
+function conflicts(tid,d,p,classId){
+  if(!classId)return[];
+  return S.teachers.filter(o=>o.id!==tid&&(slotOf(o.id,d,p)||{}).classId===classId).map(o=>o.name);
+}
+VIEWS.schedule=()=>{
+  if(!S.teachers.length)return head('ตารางสอนครู','')+'<div class="card empty"><b>ยังไม่มีครู</b>เพิ่มครูที่เมนู “ครู” ก่อน แล้วกลับมากรอกตารางสอน</div>';
+  if(!V.sched||!T(V.sched))V.sched=S.teachers[0].id;
+  const t=T(V.sched),i=S.teachers.indexOf(t),n=nSlots(t.id);
+  let g='<div class="tt"><div class="h" style="border-radius:12px 0 0 0"></div>'+DAYS.slice(0,5).map(d=>'<div class="h">'+d+'</div>').join('');
+  PER.forEach(p=>{
+    g+='<div class="p"><span>'+p+'<small>คาบ</small></span></div>';
+    for(let d=1;d<=5;d++){
+      const sl=slotOf(t.id,d,p);
+      g+='<div>'+(sl?'<button class="cell has" data-act="cell" data-d="'+d+'" data-p="'+p+'" aria-label="แก้ไขวัน'+DAYS[d-1]+' คาบ '+p+'"><b>'+esc(sName(sl.subjectId))+'</b><span class="chip" style="align-self:flex-start">'+esc(cName(sl.classId))+'</span>'+(sl.note?'<small>'+esc(sl.note)+'</small>':'')+'</button>'
+        :'<button class="cell empty-c" data-act="cell" data-d="'+d+'" data-p="'+p+'" aria-label="เพิ่มวิชาวัน'+DAYS[d-1]+' คาบ '+p+'">'+ico('plus',16)+' เพิ่ม</button>')+'</div>';
+    }
+  });
+  g+='</div>';
+  return head('ตารางสอนครู','กดช่องใดก็ได้เพื่อเพิ่ม แก้ไข หรือลบวิชาในคาบนั้น')
+   +'<div class="toolbar"><button class="btn icon" data-act="tshift" data-n="-1" aria-label="ครูคนก่อนหน้า" '+(i<=0?'disabled':'')+'>'+ico('left')+'</button>'
+   +'<div class="field" style="flex:1 1 240px;max-width:340px"><label for="selT" class="lbl" style="position:absolute;left:-9999px">เลือกครู</label><select id="selT" data-chg="selT">'+opts(S.teachers,t.id,x=>x.name)+'</select></div>'
+   +'<button class="btn icon" data-act="tshift" data-n="1" aria-label="ครูคนถัดไป" '+(i>=S.teachers.length-1?'disabled':'')+'>'+ico('right')+'</button>'
+   +'<span class="chip sub">สอน '+n+' คาบ</span><span class="chip free">ว่าง '+(30-n)+' คาบ</span></div>'
+   +'<div class="card scroll">'+g+'</div>';
+};
+chg.selT=v=>{V.sched=v;render()};
+acts.tshift=d=>{const i=S.teachers.findIndex(x=>x.id===V.sched)+ +d.n;if(S.teachers[i]){V.sched=S.teachers[i].id;render()}};
+acts.cell=d=>{
+  const tid=V.sched,dd=+d.d,p=+d.p,old=slotOf(tid,dd,p);
+  const cur=old||{subjectId:'',classId:'',note:''};
+  modal('วัน'+DAYS[dd-1]+' คาบที่ '+p,
+   '<div class="dnote" style="margin-top:-6px">'+esc(tName(tid))+'</div>'
+   +'<div class="field"><label for="m_sub">รายวิชา</label><select id="m_sub">'+opts(S.subjects,cur.subjectId,s=>(s.code?s.code+' ':'')+s.name,'— เลือกรายวิชา —')+'</select></div>'
+   +'<div class="field"><label for="m_cls">ชั้นเรียน</label><select id="m_cls">'+opts(S.classes,cur.classId,c=>c.name,'— เลือกชั้นเรียน —')+'</select></div>'
+   +'<div class="field"><label for="m_note">หมายเหตุ (ไม่บังคับ)</label><input type="text" id="m_note" value="'+esc(cur.note||'')+'" placeholder="เช่น ห้องคอมพิวเตอร์"></div>'
+   +(S.subjects.length&&S.classes.length?'':'<div class="warn">ยังไม่มี'+(S.subjects.length?'':'รายวิชา')+(!S.subjects.length&&!S.classes.length?'และ':'')+(S.classes.length?'':'ชั้นเรียน')+' เพิ่มได้จากเมนูด้านข้าง</div>')
+   +'<div class="warn" id="cw" hidden></div><div class="err" id="ferr"></div>',
+   (old?'<button class="btn danger l" id="delBtn">'+ico('trash',16)+'ลบวิชานี้</button>':'')+'<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  const chk=()=>{const w=conflicts(tid,dd,p,$('#m_cls').value),el=$('#cw');el.hidden=!w.length;if(w.length)el.textContent='ชั้นนี้มี '+w.join(', ')+' สอนในคาบเดียวกันอยู่แล้ว (บันทึกได้ หากเป็นการสอนร่วมกัน)'};
+  $('#m_cls').onchange=chk;chk();
+  $('#saveBtn').onclick=()=>{
+    const subjectId=$('#m_sub').value,classId=$('#m_cls').value,note=$('#m_note').value.trim();
+    if(!subjectId&&!classId){$('#ferr').textContent='เลือกรายวิชาหรือชั้นเรียนอย่างน้อยหนึ่งอย่าง';return}
+    (S.schedule[tid]=S.schedule[tid]||{})[dd+'-'+p]={subjectId,classId,note};
+    closeModal();commit(['schedule']);
+  };
+  if(old)$('#delBtn').onclick=()=>{delete S.schedule[tid][dd+'-'+p];closeModal();commit(['schedule']);toast('ลบวิชาแล้ว')};
+};
+
+/* ---- classes ---- */
+const clsUse=id=>{let n=0;Object.values(S.schedule).forEach(m=>Object.values(m).forEach(s=>{if(s.classId===id)n++}));return n};
+VIEWS.classes=()=>{
+  const rows=S.classes.map(c=>'<div class="row"><div class="grow"><b style="font-family:var(--f-display);font-size:17px">'+esc(c.name)+'</b><div class="dnote">'+(c.home&&T(c.home)?'ครูประจำชั้น '+esc(tName(c.home)):'ยังไม่ระบุครูประจำชั้น')+'</div></div>'
+    +'<span class="chip">'+clsUse(c.id)+' คาบในตารางสอน</span><div class="tools"><button class="btn sm" data-act="cedit" data-id="'+c.id+'">'+ico('edit',16)+'แก้ไข</button><button class="btn sm danger" data-act="cdel" data-id="'+c.id+'" aria-label="ลบ '+esc(c.name)+'">'+ico('trash',16)+'ลบ</button></div></div>').join('');
+  return head('ชั้นเรียน','ทั้งหมด '+S.classes.length+' ห้อง','<button class="btn primary" data-act="cadd">'+ico('plus',18)+'เพิ่มชั้นเรียน</button>')
+   +'<div class="card list">'+(rows||'<div class="empty"><b>ยังไม่มีชั้นเรียน</b>เพิ่มห้องเรียน เช่น ม.1/1 เพื่อใช้ในตารางสอน</div>')+'</div>';
+};
+function classModal(id){
+  const c=id?C(id):{name:'',home:''};
+  modal(id?'แก้ไขชั้นเรียน':'เพิ่มชั้นเรียน',
+   '<div class="field"><label for="f_name">ชื่อชั้นเรียน</label><input type="text" id="f_name" value="'+esc(c.name)+'" placeholder="เช่น ม.1/1"></div>'
+   +'<div class="field"><label for="f_home">ครูประจำชั้น (ไม่บังคับ)</label><select id="f_home">'+opts(S.teachers,c.home,t=>t.name,'— ไม่ระบุ —')+'</select></div><div class="err" id="ferr"></div>',
+   '<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  $('#saveBtn').onclick=()=>{
+    const name=$('#f_name').value.trim(),home=$('#f_home').value;
+    if(!name){$('#ferr').textContent='กรุณากรอกชื่อชั้นเรียน';return}
+    if(S.classes.some(x=>x.id!==id&&x.name===name)){$('#ferr').textContent='มีชั้นเรียนนี้อยู่แล้ว';return}
+    if(id){c.name=name;c.home=home}else S.classes.push({id:uid(),name,home});
+    closeModal();commit(['classes']);toast('บันทึกแล้ว');
+  };
+}
+acts.cadd=()=>classModal(null);acts.cedit=d=>classModal(d.id);
+acts.cdel=d=>{const n=clsUse(d.id);confirmBox('ลบชั้นเรียน',n?cName(d.id)+' ถูกใช้ในตารางสอน '+n+' คาบ ช่องเหล่านั้นจะแสดงชั้นเป็น “—”':'ลบ '+cName(d.id)+' ออกจากระบบ','ลบชั้นเรียน',()=>{S.classes=S.classes.filter(x=>x.id!==d.id);commit(['classes']);toast('ลบแล้ว')})};
+
+/* ---- subjects ---- */
+const subUse=id=>{let n=0;Object.values(S.schedule).forEach(m=>Object.values(m).forEach(s=>{if(s.subjectId===id)n++}));return n};
+VIEWS.subjects=()=>{
+  const rows=S.subjects.map(s=>'<div class="row"><div class="grow"><b>'+esc(s.name)+'</b><div class="dnote">'+(s.code?'รหัสวิชา '+esc(s.code):'ไม่ได้ระบุรหัสวิชา')+'</div></div>'
+    +'<span class="chip">'+subUse(s.id)+' คาบในตารางสอน</span><div class="tools"><button class="btn sm" data-act="sedit" data-id="'+s.id+'">'+ico('edit',16)+'แก้ไข</button><button class="btn sm danger" data-act="sdel" data-id="'+s.id+'" aria-label="ลบ '+esc(s.name)+'">'+ico('trash',16)+'ลบ</button></div></div>').join('');
+  return head('รายวิชา','ทั้งหมด '+S.subjects.length+' วิชา','<button class="btn primary" data-act="sadd">'+ico('plus',18)+'เพิ่มรายวิชา</button>')
+   +'<div class="card list">'+(rows||'<div class="empty"><b>ยังไม่มีรายวิชา</b>เพิ่มรายวิชา เช่น ท21101 ภาษาไทย</div>')+'</div>';
+};
+function subjectModal(id){
+  const s=id?SB(id):{code:'',name:''};
+  modal(id?'แก้ไขรายวิชา':'เพิ่มรายวิชา',
+   '<div class="field"><label for="f_code">รหัสวิชา (ไม่บังคับ)</label><input type="text" id="f_code" value="'+esc(s.code||'')+'" placeholder="เช่น ค21101"></div>'
+   +'<div class="field"><label for="f_name">ชื่อวิชา</label><input type="text" id="f_name" value="'+esc(s.name)+'" placeholder="เช่น คณิตศาสตร์"></div><div class="err" id="ferr"></div>',
+   '<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  $('#saveBtn').onclick=()=>{
+    const name=$('#f_name').value.trim(),code=$('#f_code').value.trim();
+    if(!name){$('#ferr').textContent='กรุณากรอกชื่อวิชา';return}
+    if(id){s.name=name;s.code=code}else S.subjects.push({id:uid(),code,name});
+    closeModal();commit(['subjects']);toast('บันทึกแล้ว');
+  };
+}
+acts.sadd=()=>subjectModal(null);acts.sedit=d=>subjectModal(d.id);
+acts.sdel=d=>{const n=subUse(d.id);confirmBox('ลบรายวิชา',n?sName(d.id)+' ถูกใช้ในตารางสอน '+n+' คาบ ช่องเหล่านั้นจะแสดงเป็น “ไม่ระบุวิชา”':'ลบ '+sName(d.id)+' ออกจากระบบ','ลบรายวิชา',()=>{S.subjects=S.subjects.filter(x=>x.id!==d.id);commit(['subjects']);toast('ลบแล้ว')})};
+/* ================= VIEWS: daily work ================= */
+const leavePeriods=l=>l.allDay?'ทั้งวัน':'คาบ '+(l.periods||[]).slice().sort().join(', ');
+const rangeText=l=>l.from===l.to?thaiShort(l.from):thaiShort(l.from)+' – '+thaiShort(l.to);
+
+/* ---- assign substitutes ---- */
+VIEWS.subs=()=>{
+  const date=V.date,needs=needsOn(date);
+  const all=needs.reduce((a,x)=>a.concat(x.rows),[]);
+  const done=all.filter(r=>r.rec&&r.rec.subId).length;
+  let h=head('จัดสอนแทน','เลือกวัน ระบบจะแสดงคาบที่ครูลา พร้อมรายชื่อครูที่ว่างในคาบนั้นให้เลือก',
+    '<button class="btn primary" data-act="autoAll"'+(all.length-done?'':' disabled')+'>'+ico('wand',18)+'จัดให้อัตโนมัติ</button>')+dateBar('date');
+  if(wd(date)>4)return h+'<div class="card empty"><b>วันเสาร์-อาทิตย์ไม่มีคาบสอน</b>เลือกวันจันทร์ถึงศุกร์</div>';
+  h+='<div class="stats"><div class="card stat"><b>'+needs.length+'</b><span>ครูที่ลาวันนี้ (คน)</span></div><div class="card stat"><b>'+all.length+'</b><span>คาบที่ต้องมีครูแทน</span></div>'
+    +'<div class="card stat"><b style="color:var(--free)">'+done+'</b><span>จัดครูแทนแล้ว</span></div><div class="card stat"><b style="color:'+(all.length-done?'var(--leave)':'var(--fg)')+'">'+(all.length-done)+'</b><span>ยังไม่มีครูแทน</span></div></div>';
+  if(all.length)h+='<div class="bar" aria-hidden="true"><i style="width:'+Math.round(done/all.length*100)+'%"></i></div>';
+  if(!needs.length)return h+'<div class="card empty"><b>ไม่มีครูลาในวันนี้</b>บันทึกการลาที่เมนู “ครูลา” แล้วกลับมาจัดครูแทนที่นี่</div>';
+  needs.forEach(n=>{
+    const lt=n.leaves.map(l=>l.type+' ('+leavePeriods(l)+')').join(' · ');
+    h+='<div class="card"><div class="card-h"><div class="who">'+avatar(n.t)+'<div><b>'+esc(n.t.name)+'</b><small>'+esc(lt)+'</small></div></div><span class="chip leave">ลา</span></div>';
+    if(!n.rows.length)h+='<div class="empty" style="padding:20px"><b>ไม่มีคาบสอนในช่วงที่ลา</b>ถ้าครูท่านนี้ควรมีคาบสอน ให้ตรวจที่เมนู “ตารางสอนครู” <button class="btn sm" data-act="tsched" data-id="'+n.t.id+'">เปิดตารางสอน</button></div>';
+    n.rows.forEach(r=>{
+      const cand=candidates(date,r.p,n.t.id),cur=r.rec&&r.rec.subId;
+      const list=cand.slice();if(cur&&!list.some(x=>x.id===cur)&&T(cur))list.unshift(T(cur));
+      h+='<div class="slot'+(cur?' done':'')+'"><div class="pn" aria-label="คาบที่ '+r.p+'">'+r.p+'</div>'
+       +'<div style="min-width:0"><b>'+esc(sName(r.sl.subjectId))+'</b><div class="dnote">ชั้น '+esc(cName(r.sl.classId))+(r.sl.note?' · '+esc(r.sl.note):'')+'</div></div>'
+       +'<div class="field"><label class="lbl" style="position:absolute;left:-9999px" for="as_'+n.t.id+'_'+r.p+'">ครูสอนแทน</label><select id="as_'+n.t.id+'_'+r.p+'" data-chg="assign" data-a="'+n.t.id+'" data-p="'+r.p+'"><option value="">— เลือกครูสอนแทน —</option>'
+       +list.map(x=>'<option value="'+x.id+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name)+' · แทนวันนี้ '+dayLoad(x.id,date)+' คาบ</option>').join('')+'</select>'
+       +(!cand.length&&!cur?'<span class="err">ไม่มีครูว่างในคาบนี้</span>':'')+'</div>'
+       +'<div class="tools">'+(cur?'<span class="chip free">จัดแล้ว</span>':'<button class="btn sm" data-act="autoOne" data-a="'+n.t.id+'" data-p="'+r.p+'">'+ico('wand',15)+'แนะนำ</button>')+'</div></div>';
+    });
+    h+='</div>';
+  });
+  return h;
+};
+chg.assign=(v,el,d)=>{const t=d.a,p=+d.p,sl=slotOf(t,wd(V.date)+1,p);if(!sl)return;assign(V.date,p,t,v,sl);commit(['subs'])};
+acts.autoOne=d=>{
+  const p=+d.p,sl=slotOf(d.a,wd(V.date)+1,p),c=candidates(V.date,p,d.a)[0];
+  if(!c){toast('ไม่มีครูว่างในคาบนี้');return}
+  assign(V.date,p,d.a,c.id,sl);commit(['subs']);toast('จัด '+shortName(c)+' สอนแทนคาบที่ '+p);
+};
+acts.autoAll=()=>{
+  let ok=0,miss=0;
+  needsOn(V.date).forEach(n=>n.rows.forEach(r=>{
+    if(subRec(V.date,r.p,n.t.id)&&subRec(V.date,r.p,n.t.id).subId)return;
+    const c=candidates(V.date,r.p,n.t.id)[0];
+    if(c){assign(V.date,r.p,n.t.id,c.id,r.sl);ok++}else miss++;
+  }));
+  commit(['subs']);toast('จัดแล้ว '+ok+' คาบ'+(miss?' · ยังไม่มีครูว่าง '+miss+' คาบ':''));
+};
+
+/* ---- leaves ---- */
+VIEWS.leaves=()=>{
+  const ym=V.leaveMonth;
+  let list=S.leaves.slice();
+  if(!V.leaveAll){list=list.filter(l=>l.from<=ym+'-31'&&l.to>=ym+'-01').sort((a,b)=>a.from.localeCompare(b.from))}
+  else list.sort((a,b)=>b.from.localeCompare(a.from));
+  const rows=list.map(l=>{
+    const t=T(l.teacherId);
+    return '<div class="row"><div class="grow who">'+avatar(t)+'<div><b>'+esc(tName(l.teacherId))+'</b><small>'+esc(rangeText(l))+(l.note?' · '+esc(l.note):'')+'</small></div></div>'
+     +'<span class="chip leave">'+esc(l.type)+'</span><span class="chip">'+esc(leavePeriods(l))+'</span>'
+     +'<div class="tools"><button class="btn sm" data-act="lsub" data-id="'+l.id+'">'+ico('swap',16)+'จัดสอนแทน</button><button class="btn sm" data-act="ledit" data-id="'+l.id+'">'+ico('edit',16)+'แก้ไข</button><button class="btn sm danger" data-act="ldel" data-id="'+l.id+'" aria-label="ลบการลา">'+ico('trash',16)+'ลบ</button></div></div>';
+  }).join('');
+  return head('ครูลา','บันทึกครูที่ลา ไปราชการ หรืออบรม แล้วนำไปจัดครูสอนแทน','<button class="btn primary" data-act="ladd">'+ico('plus',18)+'บันทึกการลา</button>')
+   +'<div class="toolbar"><div class="seg" role="group" aria-label="ช่วงเวลา"><button aria-pressed="'+!V.leaveAll+'" data-act="lall" data-v="0">รายเดือน</button><button aria-pressed="'+V.leaveAll+'" data-act="lall" data-v="1">ทั้งหมด</button></div>'
+   +(V.leaveAll?'':'<div class="field" style="width:190px"><label class="lbl" for="lm" style="position:absolute;left:-9999px">เดือน</label><input type="month" id="lm" value="'+ym+'" data-chg="lmonth"></div><span class="chip sun">'+esc(thaiMonth(ym))+'</span>')
+   +'<span class="muted">'+list.length+' รายการ</span></div>'
+   +'<div class="card list">'+(rows||'<div class="empty"><b>ไม่มีการลาในช่วงนี้</b>กด “บันทึกการลา” เพื่อเพิ่มรายการ</div>')+'</div>';
+};
+acts.lall=d=>{V.leaveAll=d.v==='1';render()};
+chg.lmonth=v=>{if(v){V.leaveMonth=v;render()}};
+acts.lsub=d=>{const l=S.leaves.find(x=>x.id===d.id);let dt=l.from;if(TODAY>=l.from&&TODAY<=l.to)dt=TODAY;V.date=nextWorkday(dt);view='subs';render();window.scrollTo(0,0)};
+function leaveModal(id){
+  if(!S.teachers.length){toast('เพิ่มครูที่เมนู “ครู” ก่อน');return}
+  const l=id?S.leaves.find(x=>x.id===id):{teacherId:S.teachers[0].id,type:LEAVE_TYPES[0],from:V.date,to:V.date,allDay:true,periods:[],note:''};
+  let per=(l.periods||[]).slice();
+  modal(id?'แก้ไขการลา':'บันทึกการลา',
+   '<div class="field"><label for="f_t">ครู</label><select id="f_t">'+opts(S.teachers,l.teacherId,t=>t.name)+'</select></div>'
+   +'<div class="field"><label for="f_type">ประเภท</label><select id="f_type">'+LEAVE_TYPES.map(x=>'<option'+(x===l.type?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'
+   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="field"><label for="f_from">ตั้งแต่วันที่</label><input type="date" id="f_from" value="'+l.from+'"></div><div class="field"><label for="f_to">ถึงวันที่</label><input type="date" id="f_to" value="'+l.to+'"></div></div>'
+   +'<label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="f_all"'+(l.allDay?' checked':'')+'> ลาทั้งวัน</label>'
+   +'<div id="pwrap"'+(l.allDay?' hidden':'')+'><div class="lbl" style="margin-bottom:6px">เลือกคาบที่ลา</div><div class="pgrid" id="pg">'+PER.map(p=>'<button type="button" data-p="'+p+'" aria-pressed="'+per.includes(p)+'">'+p+'</button>').join('')+'</div></div>'
+   +'<div class="field"><label for="f_note">หมายเหตุ (ไม่บังคับ)</label><input type="text" id="f_note" value="'+esc(l.note||'')+'"></div><div class="dnote">ระบบนับเฉพาะวันจันทร์ถึงศุกร์</div><div class="err" id="ferr"></div>',
+   '<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  $('#f_all').onchange=e=>{$('#pwrap').hidden=e.target.checked};
+  $('#pg').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=+b.dataset.p;per=per.includes(p)?per.filter(x=>x!==p):per.concat(p);b.setAttribute('aria-pressed',per.includes(p))};
+  $('#f_from').onchange=()=>{if($('#f_to').value<$('#f_from').value)$('#f_to').value=$('#f_from').value};
+  $('#saveBtn').onclick=()=>{
+    const from=$('#f_from').value,to=$('#f_to').value||from,allDay=$('#f_all').checked;
+    if(!from){$('#ferr').textContent='เลือกวันที่เริ่มลา';return}
+    if(to<from){$('#ferr').textContent='วันสิ้นสุดต้องไม่ก่อนวันเริ่ม';return}
+    if(!allDay&&!per.length){$('#ferr').textContent='เลือกคาบที่ลาอย่างน้อย 1 คาบ หรือเลือกลาทั้งวัน';return}
+    const rec={id:id||uid(),teacherId:$('#f_t').value,type:$('#f_type').value,from,to,allDay,periods:allDay?[]:per.slice().sort(),note:$('#f_note').value.trim()};
+    if(id)S.leaves[S.leaves.findIndex(x=>x.id===id)]=rec;else S.leaves.push(rec);
+    closeModal();commit(['leaves']);toast('บันทึกการลาแล้ว');
+  };
+}
+acts.ladd=()=>leaveModal(null);acts.ledit=d=>leaveModal(d.id);
+acts.ldel=d=>confirmBox('ลบรายการลา','ลบการลาของ '+tName(S.leaves.find(x=>x.id===d.id).teacherId)+' รายการสอนแทนที่จัดไว้แล้วจะไม่ถูกลบ','ลบการลา',()=>{S.leaves=S.leaves.filter(x=>x.id!==d.id);commit(['leaves']);toast('ลบแล้ว')});
+
+/* ---- free periods ---- */
+VIEWS.free=()=>{
+  const wk=weekOf(V.freeDate),real=V.freeReal;
+  let g='<div class="tt" style="grid-template-columns:64px repeat(5,minmax(150px,1fr));min-width:830px"><div class="h"></div>'
+   +wk.map((d,i)=>'<div class="h" style="'+(d===TODAY?'background:var(--accent-soft);color:var(--accent)':'')+'">'+DAYS[i]+'<div class="dnote" style="font-family:var(--f-body);font-weight:400">'+thaiShort(d)+'</div></div>').join('');
+  PER.forEach(p=>{
+    g+='<div class="p"><span>'+p+'<small>คาบ</small></span></div>';
+    wk.forEach(d=>{
+      const fr=S.teachers.filter(t=>isFree(t.id,d,p,real));
+      g+='<div class="fc">'+(fr.length?'<div class="dnote" style="margin-bottom:5px">ว่าง '+fr.length+' คน</div><div class="free-chips">'+fr.map(t=>'<span class="chip" title="'+esc(t.name)+'">'+esc(shortName(t))+'</span>').join('')+'</div>':'<span class="muted">ไม่มีครูว่าง</span>')+'</div>';
+    });
+  });
+  g+='</div>';
+  return head('คาบว่าง','ดูว่าครูคนไหนว่างในแต่ละคาบตลอดสัปดาห์')
+   +'<div class="toolbar"><button class="btn icon" data-act="wshift" data-n="-7" aria-label="สัปดาห์ก่อนหน้า">'+ico('left')+'</button>'
+   +'<div class="field" style="width:170px"><label class="lbl" for="d_freeDate" style="position:absolute;left:-9999px">เลือกวันในสัปดาห์</label><input type="date" id="d_freeDate" value="'+V.freeDate+'" data-chg="dset" data-k="freeDate"></div>'
+   +'<button class="btn icon" data-act="wshift" data-n="7" aria-label="สัปดาห์ถัดไป">'+ico('right')+'</button><button class="btn" data-act="dtoday" data-k="freeDate">สัปดาห์นี้</button>'
+   +'<span class="chip sun">'+thaiShort(wk[0])+' – '+thaiShort(wk[4])+'</span>'
+   +'<div class="seg" role="group" aria-label="โหมดแสดงผล"><button aria-pressed="'+real+'" data-act="fmode" data-v="1">ตามวันที่จริง</button><button aria-pressed="'+!real+'" data-act="fmode" data-v="0">ตารางประจำ</button></div></div>'
+   +'<div class="dnote">'+(real?'ตัดครูที่ลาและครูที่ถูกจัดไปสอนแทนในคาบนั้นออกจากรายชื่อ':'แสดงจากตารางสอนประจำสัปดาห์เท่านั้น ไม่นับการลาและการสอนแทน')+'</div>'
+   +'<div class="card scroll">'+g+'</div>';
+};
+acts.wshift=d=>{V.freeDate=addDays(V.freeDate,+d.n);render()};
+acts.fmode=d=>{V.freeReal=d.v==='1';render()};
+/* ================= daily sheet ================= */
+function dailyRows(date){
+  const rows=[],keys=new Set();
+  needsOn(date).forEach(n=>n.rows.forEach(r=>{
+    keys.add(r.p+'|'+n.t.id);
+    rows.push({p:r.p,absent:n.t,classId:r.sl.classId,subjectId:r.sl.subjectId,sub:r.rec&&r.rec.subId?T(r.rec.subId):null});
+  }));
+  S.subs.filter(x=>x.date===date&&x.subId&&!keys.has(x.period+'|'+x.absentId)).forEach(x=>rows.push({p:x.period,absent:T(x.absentId)||{id:'?',name:'(ครูที่ถูกลบ)'},classId:x.classId,subjectId:x.subjectId,sub:T(x.subId)||{id:'?',name:'(ครูที่ถูกลบ)'}}));
+  rows.sort((a,b)=>a.p-b.p||String(a.absent.name).localeCompare(b.absent.name,'th'));
+  return rows;
+}
+const titleOf=()=>S.meta.title||'ใบมอบหมายสอนแทน';
+VIEWS.daily=()=>{
+  const date=V.date,rows=dailyRows(date);
+  const subs=new Set(rows.filter(r=>r.sub).map(r=>r.sub.id)).size,miss=rows.filter(r=>!r.sub).length;
+  let h=head('ตารางสอนแทนประจำวัน','สรุปครูที่ลาและครูสอนแทนของวันที่เลือก ใช้แสดงหรือส่งต่อให้ครูได้เลย',
+    '<button class="btn" data-act="msettings">'+ico('gear',18)+'ตั้งค่าหัวกระดาษ</button>'+(dl?'<button class="btn primary" id="pdfBtn" data-act="pdf"'+(rows.length?'':' disabled')+'>'+ico('down',18)+'บันทึกเป็น PDF</button>':''))+dateBar('date');
+  if(wd(date)>4)return h+'<div class="card empty"><b>วันเสาร์-อาทิตย์ไม่มีคาบสอน</b>เลือกวันจันทร์ถึงศุกร์</div>';
+  let b='<div class="sheet-t"><div class="s">'+esc(S.meta.school||'ชื่อโรงเรียน')+'</div><div class="t">'+esc(titleOf())+'</div><div class="muted">'+esc(thaiDate(date))+'</div></div>';
+  if(!rows.length)b+='<div class="empty"><b>ไม่มีรายการสอนแทนในวันนี้</b>ไม่มีครูลาที่มีคาบสอน หรือยังไม่ได้บันทึกการลา</div>';
+  PER.forEach(p=>{
+    const g=rows.filter(r=>r.p===p);if(!g.length)return;
+    b+='<div class="grp"><div class="pn" style="width:48px;height:48px;font-size:21px">'+p+'</div><div>'
+     +g.map(r=>'<div class="ent"><div style="min-width:0"><b>'+esc(sName(r.subjectId))+'</b><div class="dnote">ชั้น '+esc(cName(r.classId))+'</div></div>'
+       +'<div class="who" style="min-width:0">'+avatar(r.absent.id==='?'?null:r.absent,28)+'<div><span class="chip leave">ลา</span> <span>'+esc(r.absent.name)+'</span></div></div>'
+       +'<div class="who" style="min-width:0"><span class="arrow">'+ico('right',16)+'</span>'+(r.sub?avatar(r.sub.id==='?'?null:r.sub,28)+'<div><span class="chip sub">สอนแทน</span> <b>'+esc(r.sub.name)+'</b></div>':'<span class="chip leave">ยังไม่มีครูสอนแทน</span>')+'</div></div>').join('')
+     +'</div></div>';
+  });
+  if(rows.length)b+='<div class="toolbar" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><span class="chip sun">รวม '+rows.length+' คาบ</span><span class="chip sub">ครูสอนแทน '+subs+' คน</span>'+(miss?'<span class="chip leave">ยังไม่จัด '+miss+' คาบ</span>':'<span class="chip free">จัดครบทุกคาบ</span>')+'</div>';
+  return h+'<div class="card sheet">'+b+'</div>';
+};
+acts.msettings=()=>{
+  modal('ตั้งค่าหัวกระดาษ',
+   '<div class="field"><label for="f_school">ชื่อโรงเรียน</label><input type="text" id="f_school" value="'+esc(S.meta.school||'')+'"></div>'
+   +'<div class="field"><label for="f_title">หัวเรื่อง</label><input type="text" id="f_title" value="'+esc(titleOf())+'"></div>'
+   +'<div class="field"><label for="f_signer">ตำแหน่งผู้ลงนาม (ท้ายเอกสาร PDF)</label><input type="text" id="f_signer" value="'+esc(S.meta.signer||'')+'" placeholder="เช่น หัวหน้าฝ่ายวิชาการ"></div>',
+   '<button class="btn" data-act="close">ยกเลิก</button><button class="btn primary" id="saveBtn">บันทึก</button>');
+  $('#saveBtn').onclick=()=>{S.meta.school=$('#f_school').value.trim();S.meta.title=$('#f_title').value.trim()||'ใบมอบหมายสอนแทน';S.meta.signer=$('#f_signer').value.trim();closeModal();commit(['meta']);toast('บันทึกแล้ว')};
+};
+
+/* ---- PDF (pages drawn on canvas, wrapped as a PDF) ---- */
+const F_D='"Prompt","IBM Plex Sans Thai",sans-serif',F_B='"IBM Plex Sans Thai","Prompt",sans-serif';
+function drawPage(rows,pi,np,date){
+  const W=1754,H=1240,M=80,RPP=11;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);x.fillStyle='#1F7BF2';x.fillRect(0,0,W,16);x.fillStyle='#FFC52E';x.fillRect(0,16,W,6);
+  x.textBaseline='middle';
+  const txt=(s,px,py,font,col,al)=>{x.font=font;x.fillStyle=col;x.textAlign=al||'left';x.fillText(s,px,py)};
+  const fit=(s,w,font)=>{x.font=font;if(x.measureText(s).width<=w)return s;const a=Array.from(s);while(a.length&&x.measureText(a.join('')+'…').width>w)a.pop();return a.join('')+'…'};
+  txt(S.meta.school||'',W/2,76,'600 40px '+F_D,'#11243A','center');
+  txt(titleOf(),W/2,140,'700 54px '+F_D,'#1F7BF2','center');
+  txt(thaiDate(date),W/2,196,'500 32px '+F_B,'#5B7089','center');
+  const cols=[{w:100,t:'คาบ',a:'center'},{w:150,t:'ชั้น',a:'center'},{w:340,t:'วิชา'},{w:350,t:'ครูที่ลา'},{w:350,t:'ครูสอนแทน'},{w:304,t:'ลายมือชื่อ'}];
+  const top=236,hh=64,rh=62;let cx=M;
+  x.fillStyle='#DDEBFF';x.fillRect(M,top,W-2*M,hh);
+  cols.forEach(c=>{c.x=cx;txt(c.t,c.a==='center'?cx+c.w/2:cx+16,top+hh/2,'600 27px '+F_D,'#11243A',c.a);cx+=c.w});
+  const slice=rows.slice(pi*RPP,(pi+1)*RPP);
+  slice.forEach((r,i)=>{
+    const y=top+hh+i*rh,first=i===0||slice[i-1].p!==r.p||pi*RPP+i===0;
+    if(i%2===1){x.fillStyle='#F4F8FD';x.fillRect(M,y,W-2*M,rh)}
+    const my=y+rh/2;
+    txt(first?String(r.p):'',cols[0].x+cols[0].w/2,my,'700 30px '+F_D,'#11243A','center');
+    txt(cName(r.classId),cols[1].x+cols[1].w/2,my,'500 26px '+F_B,'#11243A','center');
+    txt(fit(sName(r.subjectId),cols[2].w-28,'500 26px '+F_B),cols[2].x+16,my,'500 26px '+F_B,'#11243A');
+    txt(fit(r.absent.name,cols[3].w-28,'500 26px '+F_B),cols[3].x+16,my,'500 26px '+F_B,'#11243A');
+    if(r.sub)txt(fit(r.sub.name,cols[4].w-28,'600 26px '+F_B),cols[4].x+16,my,'600 26px '+F_B,'#1F7BF2');
+    else txt('— ยังไม่จัด —',cols[4].x+16,my,'500 26px '+F_B,'#E5483A');
+  });
+  const bottom=top+hh+Math.max(slice.length,1)*rh;
+  x.strokeStyle='#B9CDE6';x.lineWidth=2;
+  for(let i=0;i<=Math.max(slice.length,1);i++){const y=top+hh+i*rh;x.beginPath();x.moveTo(M,y);x.lineTo(W-M,y);x.stroke()}
+  x.beginPath();x.moveTo(M,top);x.lineTo(W-M,top);x.stroke();
+  let vx=M;cols.forEach(c=>{x.beginPath();x.moveTo(vx,top);x.lineTo(vx,bottom);x.stroke();vx+=c.w});x.beginPath();x.moveTo(W-M,top);x.lineTo(W-M,bottom);x.stroke();
+  if(!slice.length)txt('ไม่มีรายการสอนแทนในวันนี้',W/2,top+hh+rh/2,'500 28px '+F_B,'#5B7089','center');
+  if(pi===np-1){
+    const nsub=new Set(rows.filter(r=>r.sub).map(r=>r.sub.id)).size;
+    txt('รวมสอนแทน '+rows.length+' คาบ  ครูสอนแทน '+nsub+' คน',M,bottom+40,'600 26px '+F_D,'#11243A');
+    txt('ลงชื่อ ................................................  ผู้จัดตารางสอนแทน',M+60,1124,'500 26px '+F_B,'#11243A');
+    txt('ลงชื่อ ................................................',W-M-560,1124,'500 26px '+F_B,'#11243A');
+    if(S.meta.signer)txt('('+S.meta.signer+')',W-M-370,1166,'500 24px '+F_B,'#5B7089','center');
+  }
+  txt('หน้า '+(pi+1)+'/'+np,W-M,1206,'400 22px '+F_B,'#5B7089','right');
+  return cv;
+}
+function buildPdf(imgs){
+  const enc=new TextEncoder(),chunks=[],offs=[];let pos=0;
+  const put=v=>{const b=typeof v==='string'?enc.encode(v):v;chunks.push(b);pos+=b.length};
+  const n=imgs.length,total=2+n*3;
+  put('%PDF-1.4\n');
+  const obj=(id,fn)=>{offs[id]=pos;put(id+' 0 obj\n');fn();put('\nendobj\n')};
+  obj(1,()=>put('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2,()=>put('<< /Type /Pages /Count '+n+' /Kids ['+imgs.map((_,i)=>(3+i*3)+' 0 R').join(' ')+'] >>'));
+  imgs.forEach((im,i)=>{
+    const pg=3+i*3,ct=pg+1,ig=pg+2,cs='q 842 0 0 595 0 0 cm /Im0 Do Q';
+    obj(pg,()=>put('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /XObject << /Im0 '+ig+' 0 R >> >> /Contents '+ct+' 0 R >>'));
+    obj(ct,()=>put('<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream'));
+    obj(ig,()=>{put('<< /Type /XObject /Subtype /Image /Width '+im.w+' /Height '+im.h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+im.bytes.length+' >>\nstream\n');put(im.bytes);put('\nendstream')});
+  });
+  const xr=pos;
+  put('xref\n0 '+(total+1)+'\n0000000000 65535 f \n');
+  for(let i=1;i<=total;i++)put(String(offs[i]).padStart(10,'0')+' 00000 n \n');
+  put('trailer\n<< /Size '+(total+1)+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF');
+  return new Blob(chunks,{type:'application/pdf'});
+}
+acts.pdf=async()=>{
+  const date=V.date,rows=dailyRows(date);if(!rows.length||!dl)return;
+  const btn=$('#pdfBtn');if(btn)btn.disabled=true;
+  try{
+    await Promise.all(['600 30px Prompt','700 30px Prompt','500 26px "IBM Plex Sans Thai"','600 26px "IBM Plex Sans Thai"','400 22px "IBM Plex Sans Thai"'].map(f=>document.fonts.load(f,'กขค')));
+    const np=Math.max(1,Math.ceil(rows.length/11)),imgs=[];
+    for(let i=0;i<np;i++){
+      const cv=drawPage(rows,i,np,date),b64=cv.toDataURL('image/jpeg',0.92).split(',')[1],bin=atob(b64),bytes=new Uint8Array(bin.length);
+      for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k);
+      imgs.push({bytes,w:cv.width,h:cv.height});
+    }
+    await dl.save({filename:'ตารางสอนแทน_'+date+'.pdf',data:buildPdf(imgs)});
+    toast('บันทึกไฟล์ PDF แล้ว');
+  }catch(e){if(!e||e.code!=='declined')toast('สร้างไฟล์ PDF ไม่สำเร็จ')}
+  if(btn)btn.disabled=false;
+};
+
+/* ================= summary ================= */
+function sumRange(){
+  const d=V.sumDate,sc=V.sumScope;
+  if(sc==='day')return{dates:[d],label:thaiDate(d),bk:()=>0,cols:['จำนวนคาบ']};
+  if(sc==='week'){const w=weekOf(d);return{dates:w,label:'สัปดาห์ '+thaiShort(w[0])+' – '+thaiShort(w[4]),bk:x=>wd(x),cols:DS}}
+  const ym=d.slice(0,7),ds=monthDays(ym).filter(x=>wd(x)<5),off=wd(ym+'-01'),bk=x=>Math.floor((parse(x).getDate()-1+off)/7);
+  const nb=bk(ym+'-'+p2(monthDays(ym).length))+1;
+  return{dates:ds,label:thaiMonth(ym),bk,cols:Array.from({length:nb},(_,i)=>'สัปดาห์ '+(i+1))};
+}
+function sumData(){
+  const R=sumRange(),set=new Set(R.dates),by={};
+  S.teachers.forEach(t=>{by[t.id]={t,n:0,b:R.cols.map(()=>0),items:[]}});
+  S.subs.forEach(x=>{
+    if(!x.subId||!set.has(x.date))return;
+    if(!by[x.subId])by[x.subId]={t:T(x.subId)||{id:x.subId,name:'(ครูที่ถูกลบ)'},n:0,b:R.cols.map(()=>0),items:[]};
+    const o=by[x.subId];o.n++;o.b[R.bk(x.date)]++;o.items.push(x);
+  });
+  let list=Object.values(by);
+  if(!V.sumAll)list=list.filter(o=>o.n>0);
+  list.sort((a,b)=>b.n-a.n||String(a.t.name).localeCompare(b.t.name,'th'));
+  const total=Object.values(by).reduce((a,o)=>a+o.n,0),people=Object.values(by).filter(o=>o.n>0).length;
+  return{R,list,total,people};
+}
+VIEWS.summary=()=>{
+  const D=sumData(),R=D.R,max=Math.max(1,...D.list.map(o=>o.n));
+  const sc=V.sumScope;
+  const ctl=sc==='month'
+    ?'<button class="btn icon" data-act="sshift" data-n="-1" aria-label="เดือนก่อนหน้า">'+ico('left')+'</button><div class="field" style="width:190px"><label class="lbl" for="sm" style="position:absolute;left:-9999px">เดือน</label><input type="month" id="sm" value="'+V.sumDate.slice(0,7)+'" data-chg="smonth"></div><button class="btn icon" data-act="sshift" data-n="1" aria-label="เดือนถัดไป">'+ico('right')+'</button>'
+    :'<button class="btn icon" data-act="sshift" data-n="-1" aria-label="ก่อนหน้า">'+ico('left')+'</button><div class="field" style="width:170px"><label class="lbl" for="d_sumDate" style="position:absolute;left:-9999px">วันที่</label><input type="date" id="d_sumDate" value="'+V.sumDate+'" data-chg="dset" data-k="sumDate"></div><button class="btn icon" data-act="sshift" data-n="1" aria-label="ถัดไป">'+ico('right')+'</button>';
+  let h=head('สรุปชั่วโมงสอนแทน','นับ 1 คาบเป็น 1 ชั่วโมงสอนแทนของครูแต่ละคน',dl?'<button class="btn" data-act="csv"'+(D.total?'':' disabled')+'>'+ico('down',18)+'ดาวน์โหลด CSV</button>':'')
+   +'<div class="toolbar"><div class="seg" role="group" aria-label="ช่วงเวลา">'+[['day','รายวัน'],['week','รายสัปดาห์'],['month','รายเดือน']].map(a=>'<button aria-pressed="'+(sc===a[0])+'" data-act="sscope" data-v="'+a[0]+'">'+a[1]+'</button>').join('')+'</div>'+ctl+'<span class="chip sun">'+esc(R.label)+'</span></div>'
+   +'<div class="stats"><div class="card stat"><b>'+D.total+'</b><span>ชั่วโมงสอนแทนรวม</span></div><div class="card stat"><b>'+D.people+'</b><span>ครูที่สอนแทน (คน)</span></div><div class="card stat"><b>'+(D.people?(D.total/D.people).toFixed(1):'0')+'</b><span>เฉลี่ยต่อคน (ชม.)</span></div></div>'
+   +'<label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="sall" data-chg="sall"'+(V.sumAll?' checked':'')+'> แสดงครูทุกคน รวมคนที่ยังไม่ได้สอนแทน</label>';
+  if(!D.list.length)return h+'<div class="card empty"><b>ยังไม่มีการสอนแทนในช่วงนี้</b>จัดครูสอนแทนที่เมนู “จัดสอนแทน” แล้วสรุปจะแสดงที่นี่</div>';
+  let t='<table class="sum-t"><thead><tr><th>ครู</th>'+(R.cols.length>1?R.cols.map(c=>'<th class="n">'+c+'</th>').join(''):'')+'<th class="n">รวม (ชม.)</th><th style="width:22%">สัดส่วน</th></tr></thead><tbody>';
+  D.list.forEach(o=>{
+    const open=V.sumOpen===o.t.id;
+    t+='<tr class="clk" data-act="sopen" data-id="'+o.t.id+'" tabindex="0" aria-expanded="'+open+'"><td><div class="who">'+avatar(o.t.id.length&&T(o.t.id)?o.t:null,30)+'<b>'+esc(o.t.name)+'</b></div></td>'
+     +(R.cols.length>1?o.b.map(v=>'<td class="n">'+(v||'<span class="muted">·</span>')+'</td>').join(''):'')
+     +'<td class="n"><b>'+o.n+'</b></td><td><div class="bar"><i style="width:'+Math.round(o.n/max*100)+'%"></i></div></td></tr>';
+    if(open){
+      const its=o.items.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.period-b.period);
+      t+='<tr class="det"><td colspan="'+(R.cols.length>1?R.cols.length+3:3)+'">'+(its.length?its.map(x=>'<div style="padding:3px 0">'+esc(thaiShort(x.date))+' · คาบ '+x.period+' · '+esc(cName(x.classId))+' '+esc(sName(x.subjectId))+' · แทน '+esc(tName(x.absentId))+'</div>').join(''):'<span class="muted">ไม่มีรายการในช่วงนี้</span>')+'</td></tr>';
+    }
+  });
+  return h+'<div class="card scroll">'+t+'</tbody></table></div><div class="dnote">กดที่แถวของครูเพื่อดูรายละเอียดแต่ละคาบ</div>';
+};
+acts.sscope=d=>{V.sumScope=d.v;render()};
+acts.sshift=d=>{
+  const n=+d.n,sc=V.sumScope;
+  if(sc==='month'){const a=V.sumDate.split('-').map(Number),dt=new Date(a[0],a[1]-1+n,1);V.sumDate=fmt(dt)}
+  else if(sc==='week')V.sumDate=addDays(V.sumDate,7*n);
+  else{let x=addDays(V.sumDate,n);while(wd(x)>4)x=addDays(x,n);V.sumDate=x}
+  render();
+};
+chg.smonth=v=>{if(v){V.sumDate=v+'-01';render()}};
+chg.sall=(v,el)=>{V.sumAll=el.checked;render()};
+acts.sopen=d=>{V.sumOpen=V.sumOpen===d.id?null:d.id;render()};
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr.clk')){e.preventDefault();e.target.click()}});
+acts.csv=async()=>{
+  const D=sumData(),q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const lines=[['ครู','วันที่','คาบ','ชั้น','วิชา','สอนแทนครู'].map(q).join(',')];
+  D.list.forEach(o=>o.items.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.period-b.period).forEach(x=>lines.push([o.t.name,x.date,x.period,cName(x.classId),sName(x.subjectId),tName(x.absentId)].map(q).join(','))));
+  lines.push('');lines.push(['สรุปชั่วโมงสอนแทน',D.R.label].map(q).join(','));
+  D.list.forEach(o=>lines.push([o.t.name,o.n].map(q).join(',')));
+  try{await dl.save({filename:'สรุปสอนแทน_'+V.sumScope+'_'+V.sumDate+'.csv',data:'﻿'+lines.join('\r\n')});toast('บันทึกไฟล์ CSV แล้ว')}catch(e){if(!e||e.code!=='declined')toast('บันทึกไฟล์ไม่สำเร็จ')}
+};
+
+/* ================= boot ================= */
+/* ---- standalone: file download, backup / restore ---- */
+dl={save:async({filename,data})=>{
+  const b=data instanceof Blob?data:new Blob([data]);
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),8000);return{status:'saved'};
+}};
+acts.backup=async()=>{try{await dl.save({filename:'สำรองตารางสอนแทน_'+fmt(new Date())+'.json',data:JSON.stringify(S)});toast('สร้างไฟล์สำรองข้อมูลแล้ว')}catch(e){toast('สร้างไฟล์สำรองไม่สำเร็จ')}};
+acts.restore=()=>{
+  let inp=$('#restoreFile');
+  if(!inp){inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.id='restoreFile';inp.hidden=true;document.body.appendChild(inp);
+    inp.onchange=()=>{
+      const f=inp.files&&inp.files[0];inp.value='';if(!f)return;
+      const rd=new FileReader();
+      rd.onload=()=>{
+        let j;try{j=JSON.parse(rd.result)}catch(e){toast('ไฟล์นี้อ่านไม่ได้');return}
+        if(!j||!Array.isArray(j.teachers)||!Array.isArray(j.classes)||!Array.isArray(j.subjects)||typeof j.schedule!=='object'){toast('ไม่ใช่ไฟล์สำรองของแอปนี้');return}
+        confirmBox('กู้คืนข้อมูล','ข้อมูลปัจจุบันในเครื่องนี้ทั้งหมดจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรอง ('+j.teachers.length+' ครู, '+(j.subs||[]).length+' รายการสอนแทน)','กู้คืนข้อมูล',()=>{
+          S={teachers:j.teachers,classes:j.classes,subjects:j.subjects,schedule:j.schedule||{},leaves:j.leaves||[],subs:j.subs||[],meta:Object.assign({school:'',title:'ใบมอบหมายสอนแทน',signer:'',sample:false},j.meta||{})};
+          persisted=true;V.sched=null;commit(KEYS);toast('กู้คืนข้อมูลแล้ว');
+        });
+      };
+      rd.readAsText(f);
+    };
+  }
+  inp.click();
+};
+(function boot(){
+  $('#menuBtn').innerHTML=ico('menu');$('#menuBtn').onclick=openMenu;
+  try{const j=JSON.parse(localStorage.getItem('subsched.v1')||'null');if(j&&Array.isArray(j.teachers)){S=j;persisted=true}}catch(e){}
+  ready=true;render();
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+})();
+</script>
+</body></html>
